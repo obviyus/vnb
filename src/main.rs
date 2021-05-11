@@ -1,13 +1,16 @@
+use std::{collections::HashMap, thread::sleep};
+use std::{env, time};
+
 use chrono::Local;
 use log::warn;
 use reqwest::StatusCode;
-use std::{collections::HashMap, thread::sleep};
-use std::{env, time};
 use teloxide::prelude::*;
 use teloxide::utils::markdown::*;
 
-mod response;
 use crate::response::*;
+
+mod response;
+
 #[derive(Default, Debug, Clone)]
 struct Slot {
     center_name: String,
@@ -17,7 +20,7 @@ struct Slot {
     vaccine_name: Option<String>,
 }
 
-async fn scan_district(district_id: u16) -> Result<Option<Vec<Slot>>, Box<dyn std::error::Error>> {
+async fn scan_district(district_id: u16) -> Option<Vec<Slot>> {
     let today_date = Local::now().format("%d-%m-%Y");
     let url =
         format!("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id={}&date={}",
@@ -29,15 +32,15 @@ async fn scan_district(district_id: u16) -> Result<Option<Vec<Slot>>, Box<dyn st
                 warn!("API limit reached. Sleeping for 10s");
 
                 sleep(time::Duration::from_secs(10));
-                return Ok(None);
+                return None;
             } else {
                 match r.json::<Root>().await {
                     Ok(val) => val,
-                    _ => return Ok(None),
+                    _ => return None,
                 }
             }
         }
-        _ => return Ok(None),
+        _ => return None,
     };
 
     let mut available_centers: Vec<Slot> = Vec::new();
@@ -67,8 +70,8 @@ async fn scan_district(district_id: u16) -> Result<Option<Vec<Slot>>, Box<dyn st
     }
 
     match available_centers.len() {
-        0 => Ok(None),
-        _ => Ok(Some(available_centers)),
+        0 => None,
+        _ => Some(available_centers),
     }
 }
 
@@ -137,9 +140,9 @@ async fn run() {
         _ => warn!("No OWNER_ID set"),
     }
 
-    // List of monitored districts 
+    // List of monitored districts
     // TODO: Import from a file
-    let monitored_districts: HashMap<u16, &str> = [
+    let monitored_districts: [(u16, &str); 83] = [
         (8, "Visakhapatnam"),
         (49, "Kamrup Metropolitan"),
         (64, "Sonitpur"),
@@ -223,22 +226,16 @@ async fn run() {
         (773, "Jamnagar Corporation"),
         (775, "Rajkot Corporation"),
         (777, "Vadodara Corporation"),
-    ]
-    .iter()
-    .cloned()
-    .collect();
+    ];
 
     loop {
         for (district_id, district_name) in monitored_districts.iter() {
             match scan_district(*district_id).await {
-                Ok(val) => match val {
-                    Some(centers) => match env::var("CHANNEL_ID") {
-                        Ok(channel_id) => send_message(channel_id, centers, district_name, &bot)
-                            .await
-                            .unwrap(),
-                        _ => panic!("No CHANNEL_ID set"),
-                    },
-                    _ => (),
+                Some(centers) => match env::var("CHANNEL_ID") {
+                    Ok(channel_id) => send_message(channel_id, centers, district_name, &bot)
+                        .await
+                        .unwrap(),
+                    _ => panic!("No CHANNEL_ID set"),
                 },
                 _ => (),
             }
