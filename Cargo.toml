@@ -1,0 +1,18 @@
+[package]
+name = "vnb"
+version = "0.1.0"
+authors = ["Ayaan Zaidi <biblioklept@icloud.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+teloxide = { version = "0.4", features = ["auto-send"] }
+log = "0.4.8"
+pretty_env_logger = "0.4.0"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+chrono = "0.4"
+serde_json = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1"
