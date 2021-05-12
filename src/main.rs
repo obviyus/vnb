@@ -134,7 +134,6 @@ async fn send_message(
             None => (),
         }
     }
-    println!("{}", constructed_message);
 
     // FIXME: Set a default ParseMode
     bot.parse_mode("MarkdownV2".parse().unwrap())
