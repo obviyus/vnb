@@ -5,7 +5,7 @@ You can find one instance of this bot running at [@COVID_Vaccine_Updates](https:
 
 ## Highlights
 - **Exponential backoff** to gradually find a stable API query rate 
-- [`teloxide`](https://github.com/teloxide/teloxide) framework using [`async/.await`](https://rust-lang.github.io/async-book/01_getting_started/01_chapter.html) syntax
+- [`teloxide`](https://github.com/teloxide/teloxide) framework using [`async`](https://rust-lang.github.io/async-book/01_getting_started/01_chapter.html)
 - **Strongly typed commands** and JSON decoding
 
 ## Setting up your environment
@@ -13,24 +13,15 @@ You can find one instance of this bot running at [@COVID_Vaccine_Updates](https:
  2. Create a new bot using [@Botfather](https://t.me/botfather) to get a token in the format `123456789:abcdefgh`.
  3. Initialise the `TELOXIDE_TOKEN`, `CHANNEL_ID` and `OWNER_ID` (optional) environmental variables to your tokens and IDs. You can find your `CHANNEL_ID` and `OWNER_ID` using [@userinfobot](https://t.me/userinfobot) 
 ```bash
-# Unix-like
 $ export TELOXIDE_TOKEN=<Your token here>
 $ export CHANNEL_ID=<Your channel_id here>
 $ export OWNER_ID=<Your owner_id here>
-
-# Windows
-$ set TELOXIDE_TOKEN=<Your token here>
 ...
 ```
  4. Make sure that your Rust compiler is up to date:
 ```bash
-# If you're using stable
 $ rustup update stable
 $ rustup override set stable
-
-# If you're using nightly
-$ rustup update nightly
-$ rustup override set nightly
 ```
 5. Clone this repository and run:
 ```bash
