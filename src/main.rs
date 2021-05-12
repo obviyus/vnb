@@ -128,14 +128,13 @@ async fn send_message(
         // Not all centres provide name of vaccine
         match &slot.vaccine_name {
             Some(vaccine) => {
-                constructed_message.push_str(&format!(
-                    " | {}",
-                    bold(&vaccine.to_string()).replace("|", r"\|")
-                ));
+                constructed_message
+                    .push_str(&format!(" | {}", bold(&vaccine.to_string())).replace("|", r"\|"));
             }
             None => (),
         }
     }
+    println!("{}", constructed_message);
 
     // FIXME: Set a default ParseMode
     bot.parse_mode("MarkdownV2".parse().unwrap())
