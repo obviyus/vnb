@@ -32,14 +32,15 @@ async fn fetch_url(url: &str, client: &Client) -> Result<Root, reqwest::Error> {
 }
 
 // Query CoWin for a given district_id for the next 14 days
+#[allow(clippy::match_single_binding)]
 async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
     let mut available_centers: Vec<Slot> = Vec::new();
     let mut date = Local::now();
 
     loop {
         let url =
-        format!("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id={}&date={}",
-                district_id, date.format("%d-%m-%Y"));
+            format!("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id={}&date={}",
+                    district_id, date.format("%d-%m-%Y"));
 
         // Only proceed if we get a valid <Root> struct
         let resp: Root = match fetch_url(&url, client).await {
@@ -71,9 +72,9 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
                             }
                         },
                     };
-                    available_centers.push(slot);
 
                     // Break after finding a single valid slot
+                    available_centers.push(slot);
                     break;
                 }
             }
@@ -101,8 +102,8 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
 }
 
 async fn send_message(
-    channel_id: &String,
-    slots: &Vec<Slot>,
+    channel_id: &str,
+    slots: &[Slot],
     district_name: &str,
     bot: &teloxide::Bot,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -113,7 +114,7 @@ async fn send_message(
             &format!(
                 "\n\n{} | {} | {} slots | {}",
                 code_inline(&slot.center_name),
-                bold(&format!("{}", &slot.pincode)),
+                bold(&slot.pincode.to_string()),
                 &slot.available_capacity,
                 &slot.date
             )
@@ -127,8 +128,10 @@ async fn send_message(
         // Not all centres provide name of vaccine
         match &slot.vaccine_name {
             Some(vaccine) => {
-                constructed_message
-                    .push_str(&format!(" | {}", bold(&format!("{}", vaccine))).replace("|", r"\|"));
+                constructed_message.push_str(&format!(
+                    " | {}",
+                    bold(&vaccine.to_string()).replace("|", r"\|")
+                ));
             }
             None => (),
         }
@@ -136,7 +139,7 @@ async fn send_message(
 
     // FIXME: Set a default ParseMode
     bot.parse_mode("MarkdownV2".parse().unwrap())
-        .send_message(channel_id.clone(), format!("{}", constructed_message))
+        .send_message(channel_id.to_string(), constructed_message.to_string())
         .send()
         .await
         .expect("Failed to send message");
@@ -196,8 +199,9 @@ async fn run() {
     loop {
         for (district_id, district_name) in response::MONITORED_DISTRICTS.iter() {
             info!("scanning {}", district_name);
-            match scan_district(*district_id, &client).await {
-                Some(centers) => match seen.get(&district_id) {
+
+            if let Some(centers) = scan_district(*district_id, &client).await {
+                match seen.get(&district_id) {
                     Some(value) => {
                         if *value != centers {
                             send_message(&channel_id, &centers, district_name, &bot)
@@ -212,8 +216,7 @@ async fn run() {
                             .await
                             .unwrap()
                     }
-                },
-                _ => (),
+                }
             }
         }
     }

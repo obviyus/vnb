@@ -26,7 +26,7 @@ pub struct Center {
 pub struct Session {
     pub session_id: String,
     pub date: String,
-    // FIXME: Stored as f64 due to some sessions having capacity in floats, causing decode errors 
+    // FIXME: Stored as f64 due to some sessions having capacity in floats, causing decode errors
     pub available_capacity: f64,
     pub min_age_limit: u64,
     pub vaccine: String,
