@@ -26,7 +26,7 @@ pub struct Center {
 pub struct Session {
     pub session_id: String,
     pub date: String,
-    pub available_capacity: u64,
+    pub available_capacity: f64,
     pub min_age_limit: u64,
     pub vaccine: String,
     pub slots: Vec<String>,
@@ -37,11 +37,11 @@ pub struct Root {
     pub centers: Vec<Center>,
 }
 
-pub const user_agent: &str =
+pub const USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1";
 
 // List of monitored districts
-pub const monitored_districts: [(u16, &str); 83] = [
+pub const MONITORED_DISTRICTS: [(u16, &str); 83] = [
     (8, "Visakhapatnam"),
     (49, "Kamrup Metropolitan"),
     (64, "Sonitpur"),

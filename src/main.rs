@@ -1,18 +1,18 @@
-use std::env;
+use std::{collections::HashMap, env};
 
 use backoff::ExponentialBackoff;
 use chrono::Local;
 use log::{info, warn};
+use pretty_env_logger::formatted_timed_builder;
 use reqwest::Client;
 use teloxide::prelude::*;
 use teloxide::utils::markdown::*;
 
 use crate::response::*;
-use pretty_env_logger::formatted_timed_builder;
 
 mod response;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 struct Slot {
     center_name: String,
     pincode: String,
@@ -21,17 +21,10 @@ struct Slot {
     vaccine_name: Option<String>,
 }
 
-async fn fetch_url(url: &str, client: &Client) -> Result<Option<Root>, reqwest::Error> {
+async fn fetch_url(url: &str, client: &Client) -> Result<Root, reqwest::Error> {
     backoff::future::retry(ExponentialBackoff::default(), || async {
         info!("Fetching {}", url);
-        Ok(match client.get(url).send().await {
-            Ok(resp) => match resp.json::<Root>().await {
-                Ok(root) => Some(root),
-                _ => None,
-            },
-            // Needs to error out
-            _ => None,
-        })
+        Ok(client.get(url).send().await?.json::<Root>().await?)
     })
     .await
 }
@@ -43,12 +36,7 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
                 district_id, today_date);
 
     let resp: Root = match fetch_url(&url, client).await {
-        Ok(val) => {
-            match val {
-                Some(val) => val,
-                None => return None
-            }
-        }
+        Ok(val) => val,
         _ => {
             info!("No response, quitting.");
             return None;
@@ -58,11 +46,13 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
     let mut available_centers: Vec<Slot> = Vec::new();
     for center in resp.centers.iter() {
         for session in center.sessions.iter() {
-            if session.min_age_limit < 45 && session.available_capacity > 1 {
+            if session.min_age_limit < 45 && session.available_capacity > 1.0 {
+                info!("found valid slot: {}", center.name);
+
                 let slot: Slot = Slot {
                     center_name: center.name.clone(),
                     pincode: format!("{}", center.pincode),
-                    available_capacity: format!("{}", session.available_capacity),
+                    available_capacity: format!("{}", session.available_capacity.round()),
                     date: session.date.clone(),
                     vaccine_name: match session.vaccine.clone() {
                         name => {
@@ -88,8 +78,8 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
 }
 
 async fn send_message(
-    channel_id: String,
-    slots: Vec<Slot>,
+    channel_id: &String,
+    slots: &Vec<Slot>,
     district_name: &str,
     bot: &teloxide::Bot,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -120,7 +110,7 @@ async fn send_message(
     }
 
     bot.parse_mode("MarkdownV2".parse().unwrap())
-        .send_message(channel_id, format!("{}", constructed_message))
+        .send_message(channel_id.clone(), format!("{}", constructed_message))
         .send()
         .await
         .expect("Sending message.");
@@ -155,20 +145,38 @@ async fn run() {
         _ => warn!("No OWNER_ID set"),
     }
 
+    let channel_id: String;
+    match env::var("CHANNEL_ID") {
+        Ok(c) => channel_id = c,
+        _ => panic!("No CHANNEL_ID set"),
+    }
+
     let client = reqwest::Client::builder()
-        .user_agent(response::user_agent)
+        .user_agent(response::USER_AGENT)
         .build()
         .unwrap();
 
+    let mut seen: HashMap<&u16, Vec<Slot>> = HashMap::new();
+
     loop {
-        for (district_id, district_name) in response::monitored_districts.iter() {
+        for (district_id, district_name) in response::MONITORED_DISTRICTS.iter() {
             info!("scanning {}", district_name);
             match scan_district(*district_id, &client).await {
-                Some(centers) => match env::var("CHANNEL_ID") {
-                    Ok(channel_id) => send_message(channel_id, centers, district_name, &bot)
-                        .await
-                        .unwrap(),
-                    _ => panic!("No CHANNEL_ID set"),
+                Some(centers) => match seen.get(&district_id) {
+                    Some(value) => {
+                        if *value != centers {
+                            send_message(&channel_id, &centers, district_name, &bot)
+                                .await
+                                .unwrap();
+                            seen.insert(district_id, centers.clone());
+                        }
+                    }
+                    None => {
+                        seen.insert(district_id, centers.clone());
+                        send_message(&channel_id, &centers, district_name, &bot)
+                            .await
+                            .unwrap()
+                    }
                 },
                 _ => (),
             }

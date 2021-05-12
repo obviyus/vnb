@@ -5,7 +5,6 @@ authors = ["Ayaan Zaidi <biblioklept@icloud.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 teloxide = { version = "0.4", features = ["auto-send"] }
 log = "0.4.8"
