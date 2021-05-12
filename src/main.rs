@@ -1,13 +1,14 @@
-use std::{collections::HashMap, thread::sleep};
-use std::{env, time};
+use std::env;
 
+use backoff::ExponentialBackoff;
 use chrono::Local;
-use log::warn;
-use reqwest::StatusCode;
+use log::{info, warn};
+use reqwest::Client;
 use teloxide::prelude::*;
 use teloxide::utils::markdown::*;
 
 use crate::response::*;
+use pretty_env_logger::formatted_timed_builder;
 
 mod response;
 
@@ -20,27 +21,38 @@ struct Slot {
     vaccine_name: Option<String>,
 }
 
-async fn scan_district(district_id: u16) -> Option<Vec<Slot>> {
+async fn fetch_url(url: &str, client: &Client) -> Result<Option<Root>, reqwest::Error> {
+    backoff::future::retry(ExponentialBackoff::default(), || async {
+        info!("Fetching {}", url);
+        Ok(match client.get(url).send().await {
+            Ok(resp) => match resp.json::<Root>().await {
+                Ok(root) => Some(root),
+                _ => None,
+            },
+            // Needs to error out
+            _ => None,
+        })
+    })
+    .await
+}
+
+async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
     let today_date = Local::now().format("%d-%m-%Y");
     let url =
         format!("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id={}&date={}",
                 district_id, today_date);
 
-    let resp: Root = match reqwest::get(url).await {
-        Ok(r) => {
-            if r.status() == StatusCode::FORBIDDEN {
-                warn!("API limit reached. Sleeping for 10s");
-
-                sleep(time::Duration::from_secs(10));
-                return None;
-            } else {
-                match r.json::<Root>().await {
-                    Ok(val) => val,
-                    _ => return None,
-                }
+    let resp: Root = match fetch_url(&url, client).await {
+        Ok(val) => {
+            match val {
+                Some(val) => val,
+                None => return None
             }
         }
-        _ => return None,
+        _ => {
+            info!("No response, quitting.");
+            return None;
+        }
     };
 
     let mut available_centers: Vec<Slot> = Vec::new();
@@ -131,7 +143,10 @@ async fn start_message(
 }
 
 async fn run() {
-    teloxide::enable_logging_with_filter!(log::LevelFilter::Debug);
+    formatted_timed_builder()
+        .filter(None, log::LevelFilter::Info)
+        .init();
+
     let bot = Bot::from_env();
 
     // Send a message to the owner when bot starts
@@ -140,97 +155,15 @@ async fn run() {
         _ => warn!("No OWNER_ID set"),
     }
 
-    // List of monitored districts
-    // TODO: Import from a file
-    let monitored_districts: [(u16, &str); 83] = [
-        (8, "Visakhapatnam"),
-        (49, "Kamrup Metropolitan"),
-        (64, "Sonitpur"),
-        (74, "Araria"),
-        (86, "Muzaffarpur"),
-        (97, "Patna"),
-        (108, "Chandigarh"),
-        (109, "Raipur"),
-        (142, "West Delhi"),
-        (145, "East Delhi"),
-        (146, "North Delhi"),
-        (150, "South West Delhi"),
-        (151, "North Goa"),
-        (152, "South Goa"),
-        (154, "Ahmedabad"),
-        (187, "Panchkula"),
-        (188, "Gurgaon"),
-        (192, "Ambala"),
-        (195, "Panipat"),
-        (199, "Faridabad"),
-        (202, "Rewari"),
-        (212, "Sirmaur"),
-        (265, "Bangalore Urban"),
-        (266, "Mysore"),
-        (269, "Dakshina Kannada"),
-        (281, "Uttar Kannada"),
-        (286, "Udupi"),
-        (294, "BBMP"),
-        (296, "Thiruvananthapuram"),
-        (297, "Kannur"),
-        (300, "Pathanamthitta"),
-        (301, "Alappuzha"),
-        (302, "Malappuram"),
-        (303, "Thrissur"),
-        (304, "Kottayam"),
-        (307, "Ernakulam"),
-        (308, "Palakkad"),
-        (312, "Bhopal"),
-        (313, "Gwalior"),
-        (316, "Rewa"),
-        (348, "Guna"),
-        (362, "Betul"),
-        (363, "Pune"),
-        (365, "Nagpur"),
-        (376, "Satara"),
-        (390, "Jalgaon"),
-        (391, "Ahmednagar"),
-        (392, "Thane"),
-        (393, "Raigad"),
-        (395, "Mumbai"),
-        (397, "Aurangabad"),
-        (446, "Khurda"),
-        (453, "Sundargarh"),
-        (457, "Cuttack"),
-        (494, "Patiala"),
-        (496, "SAS Nagar"),
-        (501, "Bikaner"),
-        (502, "Jodhpur"),
-        (505, "Jaipur I"),
-        (507, "Ajmer"),
-        (512, "Alwar"),
-        (513, "Sikar"),
-        (521, "Chittorgarh"),
-        (523, "Bhilwara"),
-        (530, "Churu"),
-        (571, "Chennai"),
-        (581, "Hyderabad"),
-        (624, "Prayagraj"),
-        (650, "Gautam Buddha Nagar"),
-        (651, "Ghaziabad"),
-        (664, "Kanpur Nagar"),
-        (670, "Lucknow"),
-        (676, "Meerut"),
-        (679, "Muzaffarnagar"),
-        (689, "Shamli"),
-        (696, "Varanasi"),
-        (697, "Dehradun"),
-        (709, "Nainital"),
-        (721, "Howrah"),
-        (725, "Kolkata"),
-        (773, "Jamnagar Corporation"),
-        (775, "Rajkot Corporation"),
-        (777, "Vadodara Corporation"),
-    ];
+    let client = reqwest::Client::builder()
+        .user_agent(response::user_agent)
+        .build()
+        .unwrap();
 
     loop {
-        for (district_id, district_name) in monitored_districts.iter() {
-            match scan_district(*district_id).await {
+        for (district_id, district_name) in response::monitored_districts.iter() {
+            info!("scanning {}", district_name);
+            match scan_district(*district_id, &client).await {
                 Some(centers) => match env::var("CHANNEL_ID") {
                     Ok(channel_id) => send_message(channel_id, centers, district_name, &bot)
                         .await
