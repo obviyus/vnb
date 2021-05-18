@@ -43,10 +43,6 @@ pub const USER_AGENT: &str =
 
 // List of monitored districts
 pub const MONITORED_DISTRICTS: [(u16, &str); 83] = [
-#    (142, "West Delhi"),
-#    (145, "East Delhi"),
-#    (146, "North Delhi"),
-#    (150, "South West Delhi"),
     (105, "East Champaran"),
     (654, "Gorakhpur"),
     (702, "Haridwar"),
