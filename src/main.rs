@@ -75,7 +75,7 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
 
                     // Break after finding a single valid slot
                     available_centers.push(slot);
-                    break;
+                    //break;
                 }
             }
         }
