@@ -48,6 +48,6 @@ pub const MONITORED_DISTRICTS: [(u16, &str); 83] = [
 #    (146, "North Delhi"),
 #    (150, "South West Delhi"),
     (105, "East Champaran"),
-    (654, "Gorakhpur),
+    (654, "Gorakhpur"),
     (702, "Haridwar"),
 ];
