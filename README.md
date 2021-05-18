@@ -12,8 +12,8 @@ A dockerized version of the rust vnb app (https://github.com/obviyus/vnb)
 ## Setting up your environment
  1. Clone this repository and run:
  ```bash
-$ git clone git@github.com:deveshmanish/cowin-docker
-$ cd cowin-docker
+$ git clone git@github.com:deveshmanish/vnb
+$ cd vnb
 ```
  2. Create a new bot using [@Botfather](https://t.me/botfather) to get a token in the format `123456789:abcdefgh`.
  3. Find your `CHANNEL_ID` in which alerts have to be sent using [@userinfobot](https://t.me/userinfobot)
