@@ -42,7 +42,7 @@ pub const USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1";
 
 // List of monitored districts
-pub const MONITORED_DISTRICTS: [(u16, &str); 83] = [
+pub const MONITORED_DISTRICTS: [(u16, &str); 3] = [
     (105, "East Champaran"),
     (654, "Gorakhpur"),
     (702, "Haridwar"),
