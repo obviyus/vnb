@@ -1,4 +1,4 @@
-# cowin-docker
+# vnb
 
 Async Telegram bot written in Rust to monitor CoWin API for available vaccination slots.
 
