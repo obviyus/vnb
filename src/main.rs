@@ -1,6 +1,6 @@
+use std::thread;
 use std::{collections::HashMap, env};
 
-use backoff::ExponentialBackoff;
 use chrono::{Datelike, Duration, Local};
 use log::{info, warn};
 use pretty_env_logger::formatted_timed_builder;
@@ -18,20 +18,22 @@ struct Slot {
     center_name: String,
     pincode: String,
     available_capacity: String,
+    dose_1: String,
+    dose_2: String,
     date: String,
     vaccine_name: Option<String>,
 }
 
 // Fetch CoWin response asynchronously with exponential backoff
 async fn fetch_url(url: &str, client: &Client) -> Result<Root, reqwest::Error> {
-    backoff::future::retry(ExponentialBackoff::default(), || async {
-        info!("Fetching {}", url);
-        Ok(client.get(url).send().await?.json::<Root>().await?)
-    })
-    .await
+    info!("Fetching {}", url);
+
+    // Wait 3 seconds between each request (100 calls/5 minutes)
+    thread::sleep(std::time::Duration::from_millis(3000));
+    Ok(client.get(url).send().await?.json::<Root>().await?)
 }
 
-// Query CoWin for a given district_id for the next 14 days
+// Query CoWin for a given district_id for the next 7 days
 #[allow(clippy::match_single_binding)]
 async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
     let mut available_centers: Vec<Slot> = Vec::new();
@@ -46,14 +48,14 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
         let resp: Root = match fetch_url(&url, client).await {
             Ok(val) => val,
             _ => {
-                info!("No response");
                 return None;
             }
         };
 
         for center in resp.centers.iter() {
             for session in center.sessions.iter() {
-                if session.min_age_limit < 45 && session.available_capacity > 1.0 {
+                // Sessions with < 5 slots are completely booked
+                if session.min_age_limit < 45 && session.available_capacity > 5.0 {
                     info!("found valid slot: {}", center.name);
 
                     // Store a valid vaccination slot in <Slot>
@@ -61,6 +63,8 @@ async fn scan_district(district_id: u16, client: &Client) -> Option<Vec<Slot>> {
                         center_name: center.name.clone(),
                         pincode: format!("{}", center.pincode),
                         available_capacity: format!("{}", session.available_capacity.round()),
+                        dose_1: format!("{}", session.available_capacity_dose1),
+                        dose_2: format!("{}", session.available_capacity_dose2),
                         date: session.date.clone(),
                         vaccine_name: match session.vaccine.clone() {
                             name => {
@@ -107,15 +111,16 @@ async fn send_message(
     district_name: &str,
     bot: &teloxide::Bot,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut constructed_message = format!("*{}*", district_name);
+    let mut constructed_message = underline(&bold(district_name)).to_string();
 
     for slot in slots.iter() {
         constructed_message.push_str(
             &format!(
-                "\n\n{} | {} | {} slots | {}",
+                "\n\n{} | {} \n{} | {} | {}",
                 code_inline(&slot.center_name),
                 bold(&slot.pincode.to_string()),
-                &slot.available_capacity,
+                bold(&format!("Dose 1: {}", &slot.dose_1)),
+                bold(&format!("Dose 2: {}", &slot.dose_2)),
                 &slot.date
             )
             // Escape all MarkdownV2 reserved entities
@@ -133,14 +138,25 @@ async fn send_message(
             }
             None => (),
         }
+
+        // Collect no more than 512 bytes
+        if constructed_message.len() > 512 {
+            break;
+        }
     }
 
     // FIXME: Set a default ParseMode
-    bot.parse_mode("MarkdownV2".parse().unwrap())
+    match bot
+        .parse_mode("MarkdownV2".parse().unwrap())
         .send_message(channel_id.to_string(), constructed_message.to_string())
         .send()
         .await
-        .expect("Failed to send message");
+    {
+        Ok(_) => {}
+        Err(_) => {
+            warn!("Message too long: {} not sent", district_name)
+        }
+    }
 
     Ok(())
 }

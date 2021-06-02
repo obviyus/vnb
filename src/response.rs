@@ -1,54 +1,70 @@
 #[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
-pub struct VaccineFee {
-    pub vaccine: String,
-    pub fee: String,
+#[serde(rename_all = "camelCase")]
+pub struct Root {
+    pub centers: Vec<Center>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Center {
+    #[serde(rename = "center_id")]
     pub center_id: u64,
     pub name: String,
     pub address: String,
+    #[serde(rename = "state_name")]
     pub state_name: String,
+    #[serde(rename = "district_name")]
     pub district_name: String,
+    #[serde(rename = "block_name")]
     pub block_name: String,
     pub pincode: u64,
     pub lat: i64,
     pub long: i64,
     pub from: String,
     pub to: String,
+    #[serde(rename = "fee_type")]
     pub fee_type: String,
     pub sessions: Vec<Session>,
-    pub vaccine_fees: Option<Vec<VaccineFee>>, // Not all centers provide this field
+    #[serde(rename = "vaccine_fees")]
+    #[serde(default)]
+    pub vaccine_fees: Vec<VaccineFee>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Session {
+    #[serde(rename = "session_id")]
     pub session_id: String,
     pub date: String,
-    // FIXME: Stored as f64 due to some sessions having capacity in floats, causing decode errors
+    #[serde(rename = "available_capacity")]
     pub available_capacity: f64,
+    #[serde(rename = "min_age_limit")]
     pub min_age_limit: u64,
     pub vaccine: String,
     pub slots: Vec<String>,
+    #[serde(rename = "available_capacity_dose1")]
+    pub available_capacity_dose1: i64,
+    #[serde(rename = "available_capacity_dose2")]
+    pub available_capacity_dose2: i64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
-pub struct Root {
-    pub centers: Vec<Center>,
+#[serde(rename_all = "camelCase")]
+pub struct VaccineFee {
+    pub vaccine: String,
+    pub fee: String,
 }
 
 pub const USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1";
 
 // List of monitored districts
-pub const MONITORED_DISTRICTS: [(u16, &str); 83] = [
+pub const MONITORED_DISTRICTS: [(u16, &str); 82] = [
     (8, "Visakhapatnam"),
     (49, "Kamrup Metropolitan"),
     (64, "Sonitpur"),
     (74, "Araria"),
     (86, "Muzaffarpur"),
-    (97, "Patna"),
     (108, "Chandigarh"),
     (109, "Raipur"),
     (142, "West Delhi"),
